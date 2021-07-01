@@ -181,7 +181,7 @@ function buildJoiChildren(tp: FieldDescription) {
         } else if (typename === "Date") {
             val = buildJoiDate(tp);
         }
-    } else {
+    }  else {
         val = buildJoiObject(tp);
     }
     val = buildJoiGlobals(val, tp);

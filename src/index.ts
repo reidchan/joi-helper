@@ -3,13 +3,10 @@ export * from './decorators/FieldDescription'
 export * from './utils/BuilderUtils'
 import Joi from 'joi';
 
-function getJoiString(properties) {
-  console.log('properties', properties);
-  delete properties.designType;
-  let joi = Joi.string();
+function getJoi(type, properties) {
+  let joi = getJoiType(type);
   const messages = {};
   for (const propertyKey of Object.keys(properties)) {
-    console.log('propertyKey', propertyKey);
     const propertyValue = properties[propertyKey];
     switch (propertyKey) {
       case 'required':
@@ -24,28 +21,68 @@ function getJoiString(properties) {
   return joi;
 }
 
-export function validate(tp, data) {
-  let metadata = this.getMetadata(tp);
-  const fieldKeys = Object.keys(metadata);
+function getJoiType(type) {
+  switch (type) {
+    case 'String':
+      return Joi.string();
+    case 'Object':
+      return Joi.object();
+  }
+}
+
+function buildJoiRoot(metadata) {
+  const obj = buildJoi(metadata);
+  const schema = Joi.object(obj);
+  return schema;
+}
+
+function buildJoiChildren(object) {
+  const metadata = getMetadata(object.designType);
+  console.log('metadata', metadata);
+  if (!metadata) {
+    return Joi.any();
+  }
+  console.log('buildJoiChildren metadata', metadata);
+  const joi = getJoi('Object', object);
+  const obj = buildJoi(metadata);
+  const schema = joi['keys'](obj);
+  return schema;
+}
+
+function buildJoi(metadata) {
   const root: any = {
   };
+  const fieldKeys = Object.keys(metadata);
   for (const fieldKey of fieldKeys) {
     const primitives = ['String', 'Boolean', 'Number', 'Array', 'Date'];
     const designType = metadata[fieldKey].designType;
+    console.log('designType.name', designType.name);
     if (primitives.includes(designType.name)) {
       switch (designType.name) {
         case 'String':
-          const joiObj = getJoiString(metadata[fieldKey]);
+          const joiObj = getJoi('String', metadata[fieldKey]);
           root[fieldKey] = joiObj;
           break;
       }
+    } else if (designType.name === 'Object') {
+      const joi = Joi.any();
+      root[fieldKey] = joi;
     } else {
+      const joi = buildJoiChildren(metadata[fieldKey]);
+      root[fieldKey] = joi;
     }
   }
-  const schema = Joi.object(root);
+  return root;
+}
+
+export function validate(tp, data) {
+  let metadata = getMetadata(tp);
+  const schema = buildJoiRoot(metadata);
   const result = schema.validate(data);
+  console.log('result', result);
   if (result.error) {
     const errorInfo = result.error.details[0].message;
+    console.log('result.error.details[0]', result.error.details[0]);
     console.log('errorInfo', errorInfo);
   }
 }
